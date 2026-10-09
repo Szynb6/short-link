@@ -34,7 +34,7 @@ import java.util.List;
 public interface LinkLocaleStatsMapper extends BaseMapper<LinkLocaleStatsDO> {
 
     /**
-     * 记录地区访问监控数据
+     * 记录地区访问监控数据(唯一索引组为 full_short_url + date + country)
      */
     @Insert("INSERT INTO " +
             "t_link_locale_stats (full_short_url, date, cnt, country, province, city, adcode, create_time, update_time, del_flag) " +
@@ -43,7 +43,7 @@ public interface LinkLocaleStatsMapper extends BaseMapper<LinkLocaleStatsDO> {
     void shortLinkLocaleState(@Param("linkLocaleStats") LinkLocaleStatsDO linkLocaleStatsDO);
 
     /**
-     * 根据短链接获取指定日期内地区监控数据
+     * 根据短链接获取指定日期内地区监控数据(唯一索引组为 full_short_url + date)
      */
     @Select("SELECT " +
             "    tlls.province, " +

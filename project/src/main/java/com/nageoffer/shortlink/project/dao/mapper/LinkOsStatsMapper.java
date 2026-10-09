@@ -35,7 +35,7 @@ import java.util.List;
 public interface LinkOsStatsMapper extends BaseMapper<LinkOsStatsDO> {
 
     /**
-     * 记录地区访问监控数据
+     * 记录地区访问监控数据(唯一索引组为 full_short_url + date + os)
      */
     @Insert("INSERT INTO " +
             "t_link_os_stats (full_short_url, date, cnt, os, create_time, update_time, del_flag) " +
@@ -44,7 +44,7 @@ public interface LinkOsStatsMapper extends BaseMapper<LinkOsStatsDO> {
     void shortLinkOsState(@Param("linkOsStats") LinkOsStatsDO linkOsStatsDO);
 
     /**
-     * 根据短链接获取指定日期内操作系统监控数据
+     * 根据短链接获取指定日期内操作系统监控数据(唯一索引组为 full_short_url + date)
      */
     @Select("SELECT " +
             "    tlos.os, " +
@@ -63,7 +63,7 @@ public interface LinkOsStatsMapper extends BaseMapper<LinkOsStatsDO> {
     List<HashMap<String, Object>> listOsStatsByShortLink(@Param("param") ShortLinkStatsReqDTO requestParam);
 
     /**
-     * 根据分组获取指定日期内操作系统监控数据
+     * 根据分组获取指定日期内操作系统监控数据(唯一索引组为 gid + date)
      */
     @Select("SELECT " +
             "    tlos.os, " +

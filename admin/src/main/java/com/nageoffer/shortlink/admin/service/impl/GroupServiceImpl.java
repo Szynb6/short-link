@@ -85,12 +85,14 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                     .eq(GroupDO::getUsername, username)
                     .eq(GroupDO::getDelFlag, 0);
             List<GroupDO> groupDOList = baseMapper.selectList(queryWrapper);
+            // 检查是否超出最大分组数
             if (CollUtil.isNotEmpty(groupDOList) && groupDOList.size() == groupMaxNum) {
                 throw new ClientException(String.format("已超出最大分组数：%d", groupMaxNum));
             }
             int retryCount = 0;
             int maxRetries = 10;
             String gid = null;
+            // 重试生成分组标识,避免分组标识重复
             while (retryCount < maxRetries) {
                 gid = saveGroupUniqueReturnGid();
                 if (StrUtil.isNotEmpty(gid)) {
@@ -106,6 +108,7 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
                 }
                 retryCount++;
             }
+            // 生成分组id重试次数超过了最大的限制次数
             if (StrUtil.isEmpty(gid)) {
                 throw new ServiceException("生成分组标识频繁");
             }
@@ -170,14 +173,18 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
     }
 
     private String saveGroupUniqueReturnGid() {
+        // 生成分组标识
         String gid = RandomGenerator.generateRandom();
+        // 检查分组标识是否已存在(布隆过滤器)
         if (gidRegisterCachePenetrationBloomFilter.contains(gid)) {
             return null;
         }
+        // 保存分组标识
         GroupUniqueDO groupUniqueDO = GroupUniqueDO.builder()
                 .gid(gid)
                 .build();
         try {
+            // 数据库的唯一索引兜底，防止重复插入
             groupUniqueMapper.insert(groupUniqueDO);
         } catch (DuplicateKeyException e) {
             return null;

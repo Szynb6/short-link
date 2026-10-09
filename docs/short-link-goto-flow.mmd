@@ -1,0 +1,86 @@
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans CJK SC, PingFang SC, Microsoft YaHei, Source Han Sans CN, sans-serif','fontSize':'14px','primaryColor':'#eaf4ff','primaryBorderColor':'#4a90e2','primaryTextColor':'#1a1a1a','lineColor':'#444','secondaryColor':'#fffbe6','tertiaryColor':'#e8f5e9'},'flowchart':{'htmlLabels':true,'curve':'basis','nodeSpacing':50,'rankSpacing':42}}}%%
+flowchart TD
+    classDef startEnd fill:#eaf4ff,stroke:#4a90e2,stroke-width:2px,rx:20,ry:20,color:#1a3a66
+    classDef process fill:#ffffff,stroke:#333,stroke-width:1px,color:#1a1a1a
+    classDef decision fill:#fff3cd,stroke:#ff9800,stroke-width:2px,color:#6a4600
+    classDef db fill:#e6f7e6,stroke:#2e7d32,stroke-width:2px,color:#1b4d1d
+    classDef redis fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#5a1033
+
+    %% ================== 子流程 A：创建短链（写 t_link_goto） ==================
+    subgraph A[子流程 A  创建短链 - t_link_goto 写入（ShortLinkGotoDO 持久化）]
+        A0([开始 - 调用创建接口 createShortLink])
+        A1[生成 shortUri 并拼接 fullShortUrl]
+        A2[MurMurHash32 + 三层碰撞兜底]
+        A3{布隆判定不重复?}
+        A4{DB 事务双写成功?}
+        A5[【DB 操作】事务双写 ① INSERT t_link gid+fullShortUrl+originUrl ② INSERT t_link_goto id+gid+fullShortUrl ← ShortLinkGotoDO]
+        A6[【Redis 操作】创建时预热跳转缓存 SET short-link:goto TTL 对齐业务有效期]
+        A7[【Redis 布隆】shortUriCreateCachePenetrationBloomFilter.add fullShortUrl]
+        A8([返回短链创建成功])
+        A9([返回失败 - gid 或 短码 已占用])
+        A0 --> A1 --> A2 --> A3
+        A3 -- No --> A9
+        A3 -- Yes --> A4
+        A4 -- No 1062 DuplicateKey --> A9
+        A4 -- Yes --> A5
+        A5 --> A6 --> A7 --> A8
+    end
+
+    %% ================== 子流程 B：跳转 restoreUrl（读 t_link_goto 拿 gid） ==================
+    subgraph B[子流程 B  跳转 restoreUrl - t_link_goto 读取（七层防御链）]
+        B0([开始 - 浏览器访问 http://nurl.ink:8001/AbCd1])
+        B1[拼接 fullShortUrl = serverName + serverPort + shortUri]
+        B2[【第①层 L389 查热缓存】Redis GET short-link:goto fullShortUrl]
+        B3{热缓存命中?}
+        B4[记 PV 到 RocketMQ 异步落库 8 表 + L392 sendRedirect originUrl]
+        B5[【第②层 L397 布隆过滤】shortUriCachePenetrationBloomFilter.contains]
+        B6{布隆放行 contains=true?}
+        B7[布隆拦截 - 302 /page/notfound L400 零 DB]
+        B8[【第③层 L403 查空值哨兵】Redis GET short-link:goto-is-null]
+        B9{30 分钟内已确认不存在?}
+        B10[空值哨兵拦截 302 notfound L405 零 DB 零锁]
+        B11[【第④层 L409 加锁】Redisson single-flight lock lock:goto:fullShortUrl]
+        B12[DCL 双检锁 锁内再查 热缓存 L411 + 空值哨兵 L417]
+        B13{双检任意一项命中?}
+        B14[【第⑤层 L422 查 goto 路由表】分片键=fullShortUrl 精准 1 片 SELECT gid FROM t_link_goto ← ShortLinkGotoDO]
+        B15{goto 查询结果非空?}
+        B16[【第⑥层 L430 查真实 t_link】分片键=gid 精准 1 片 SELECT originUrl validDate 避免 16 片广播!]
+        B17[【第⑦层 L426/L437 写空值哨兵】Redis SET short-link:goto-is-null = 减号 EX 30 分钟]
+        B18{查到记录 且 validDate 未过期?}
+        B19[回填热缓存 L441 SET short-link:goto = originUrl TTL 对齐业务有效期]
+        B20[解锁 记 PV 302 跳转 originUrl L446]
+        B21[解锁 302 /page/notfound]
+        B22([结束 - 浏览器跳到长链 或 404 页])
+
+        B0 --> B1 --> B2 --> B3
+        B3 -- Yes --> B4 --> B22
+        B3 -- No --> B5 --> B6
+        B6 -- No --> B7 --> B22
+        B6 -- Yes --> B8 --> B9
+        B9 -- Yes --> B10 --> B22
+        B9 -- No --> B11 --> B12 --> B13
+        B13 -- Yes --> B21 --> B22
+        B13 -- No --> B14 --> B15
+        B15 -- No 从未分配 --> B17 --> B21
+        B15 -- Yes --> B16 --> B18
+        B18 -- No 删除 停用 过期 --> B17
+        B18 -- Yes 合法短链 --> B19 --> B20 --> B22
+    end
+
+    %% ================== 实体数据流向 ==================
+    A5 ==>|写入 gid fullShortUrl 映射对| B14
+
+    %% ================== ShortLinkGotoDO 三字段说明 ==================
+    subgraph Legend[ShortLinkGotoDO 三字段职责]
+      direction LR
+      L1[字段 id Long - 纯物理主键 每张片自增 跨片不唯一 流程中未使用]
+      L2[字段 gid String - goto 表核心输出 查出来作 t_link 的分片键 此为 goto 表存在的 99% 价值]
+      L3[字段 fullShortUrl String - goto 表核心输入 分片键加 UNIQUE 索引 与 t_link 事务双写]
+    end
+
+    %% ================== 样式批量绑定 ==================
+    class A0,A8,A9,B0,B22 startEnd
+    class A1,A2,B1,B4,B7,B10,B12,B20,B21,L1,L2,L3 process
+    class A3,A4,B3,B6,B9,B13,B15,B18 decision
+    class A5,B14,B16 db
+    class A6,A7,B2,B5,B8,B11,B17,B19 redis

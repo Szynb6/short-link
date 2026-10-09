@@ -21,12 +21,21 @@ spring:
       discovery:
         server-addr: 127.0.0.1:8848
 
+rocketmq:
+  # 本地暂未部署 RocketMQ，启动时会连接失败重试；部署后改为实际地址即可
+  name-server: 127.0.0.1:9876
+  producer:
+    group: short-link-stats-producer-group
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
+    retry-times-when-send-async-failed: 2
+
 short-link:
   domain:
     default: nurl.ink:8001
   stats:
     locale:
-      amap-key: 824c511f0997586ea016f979fdb23087
+      amap-key: 28e135603994627005130e499b9c0927
   goto-domain:
     white-list:
       enable: true

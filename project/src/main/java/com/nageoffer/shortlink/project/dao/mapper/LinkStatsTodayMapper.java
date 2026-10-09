@@ -29,7 +29,7 @@ import org.apache.ibatis.annotations.Param;
 public interface LinkStatsTodayMapper extends BaseMapper<LinkStatsTodayDO> {
 
     /**
-     * 记录今日统计监控数据
+     * 记录今日统计监控数据(唯一索引组为 full_short_url + date)
      */
     @Insert("INSERT INTO " +
             "t_link_stats_today (full_short_url, date,  today_uv, today_pv, today_uip, create_time, update_time, del_flag) " +

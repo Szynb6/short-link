@@ -4,8 +4,7 @@ spring:
   application:
     name: short-link-gateway
   profiles:
-    active: aggregation
-    # active: dev
+    active: dev
   data:
     redis:
       host: 127.0.0.1

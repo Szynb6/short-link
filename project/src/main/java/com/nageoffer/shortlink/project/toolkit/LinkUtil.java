@@ -21,6 +21,7 @@ import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.util.Date;
@@ -32,6 +33,7 @@ import static com.nageoffer.shortlink.project.common.constant.ShortLinkConstant.
  * 短链接工具类
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：link）获取项目资料
  */
+@Slf4j
 public class LinkUtil {
 
     /**
@@ -149,10 +151,10 @@ public class LinkUtil {
 
     /**
      * 获取原始链接中的域名
-     * 如果原始链接包含 www 开头的话需要去掉
+     * 域名统一转为小写（DNS 不区分大小写），循环去除 www 前缀（兼容 www.www.xxx.com 这类嵌套写法）
      *
      * @param url 创建或者修改短链接的原始链接
-     * @return 原始链接中的域名
+     * @return 原始链接中的域名，解析失败返回 null
      */
     public static String extractDomain(String url) {
         String domain = null;
@@ -160,12 +162,13 @@ public class LinkUtil {
             URI uri = new URI(url);
             String host = uri.getHost();
             if (StrUtil.isNotBlank(host)) {
-                domain = host;
-                if (domain.startsWith("www.")) {
-                    domain = host.substring(4);
+                domain = host.toLowerCase();
+                while (domain.startsWith("www.")) {
+                    domain = domain.substring(4);
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.warn("解析原始链接域名失败, url: {}", url, ex);
         }
         return domain;
     }

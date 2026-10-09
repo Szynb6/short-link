@@ -44,11 +44,6 @@ public class RedisKeyConstant {
     public static final String LOCK_GID_UPDATE_KEY = "short-link:lock:update-gid:%s";
 
     /**
-     * 短链接延迟队列消费统计 Key
-     */
-    public static final String DELAY_QUEUE_STATS_KEY = "short-link:delay-queue:stats";
-
-    /**
      * 短链接统计判断是否新用户缓存标识
      */
     public static final String SHORT_LINK_STATS_UV_KEY = "short-link:stats:uv:";
@@ -59,17 +54,17 @@ public class RedisKeyConstant {
     public static final String SHORT_LINK_STATS_UIP_KEY = "short-link:stats:uip:";
 
     /**
-     * 短链接监控消息保存队列 Topic 缓存标识
+     * 短链接统计消息 Topic
      */
-    public static final String SHORT_LINK_STATS_STREAM_TOPIC_KEY = "short-link:stats-stream";
-
-    /**
-     * 短链接监控消息保存队列 Group 缓存标识
-     */
-    public static final String SHORT_LINK_STATS_STREAM_GROUP_KEY = "short-link:stats-stream:only-group";
+    public static final String SHORT_LINK_STATS_TOPIC_KEY = "short-link-stats-topic";
 
     /**
      * 创建短链接锁标识
      */
     public static final String SHORT_LINK_CREATE_LOCK_KEY = "short-link:lock:create";
+
+    /**
+     * 统计补偿定时任务分布式锁（多实例部署时保证全集群同一时刻只有一个实例执行巡检）
+     */
+    public static final String LOCK_STATS_COMPENSATE_SCHEDULER_KEY = "short-link:lock:stats-compensate-scheduler";
 }

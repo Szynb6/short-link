@@ -38,11 +38,11 @@
         <jsoup.version>1.15.3</jsoup.version>
         <easyexcel.version>3.1.3</easyexcel.version>
         <spotless-maven-plugin.version>2.22.1</spotless-maven-plugin.version>
+        <lombok.version>1.18.34</lombok.version>
     </properties>
 
     <modules>
         <module>admin</module>
-        <module>aggregation</module>
         <module>project</module>
         <module>gateway</module>
     </modules>
@@ -51,6 +51,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
         </dependency>
     </dependencies>
 

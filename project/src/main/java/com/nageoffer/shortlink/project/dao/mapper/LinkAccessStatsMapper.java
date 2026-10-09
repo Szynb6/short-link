@@ -28,7 +28,8 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 
 /**
- * 短链接基础访问监控持久层
+ * 短链接基础访问监控持久层(唯一索引组为 full_short_url + date + hour)
+ * 同一条短链接,同一天,同一个小时,访问次数累加
  * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：link）获取项目资料
  */
 public interface LinkAccessStatsMapper extends BaseMapper<LinkAccessStatsDO> {

@@ -511,6 +511,7 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
         return actualResult;
     }
 
+    // 检查监控的短链接是否属于用户所属的分组
     public void checkGroupBelongToUser(String gid) throws ServiceException {
         String username = Optional.ofNullable(UserContext.getUsername())
                 .orElseThrow(() -> new ServiceException("用户未登录"));

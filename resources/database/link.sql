@@ -1,3 +1,6 @@
+CREATE DATABASE IF NOT EXISTS `shortlink` DEFAULT CHARACTER SET utf8mb4;
+USE `shortlink`;
+
 CREATE TABLE `t_group_0`
 (
     `id`          bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
@@ -1169,3 +1172,22 @@ CREATE TABLE `t_user_9`
     PRIMARY KEY (`id`),
     UNIQUE KEY `idx_unique_username` (`username`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=1726852231086505986 DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 短链接统计 MQ 异步发送失败补偿表
+-- ============================================================
+CREATE TABLE `t_link_stats_compensate`
+(
+    `id`              bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `msg_keys`        varchar(64)  DEFAULT NULL COMMENT 'RocketMQ KEYS 幂等唯一ID（UUID）',
+    `full_short_url`  varchar(256) DEFAULT NULL COMMENT '完整短链接（快速检索用，不用解析JSON）',
+    `payload_json`    mediumtext   DEFAULT NULL COMMENT 'ShortLinkStatsRecordDTO 完整 JSON 序列化',
+    `retry_cnt`       tinyint(1) DEFAULT 0 COMMENT '已补偿重试次数',
+    `status`          tinyint(1) DEFAULT 0 COMMENT '0待补偿 1成功 2永久失败',
+    `create_time`     datetime     DEFAULT NULL COMMENT '创建时间',
+    `update_time`     datetime     DEFAULT NULL COMMENT '修改时间',
+    `del_flag`        tinyint(1) DEFAULT 0 COMMENT '删除标识 0：未删除 1：已删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_compensate_msg_keys` (`msg_keys`) USING BTREE COMMENT '同一条消息只补偿一次（防止回调重复触发）',
+    KEY               `idx_status_create` (`status`, `create_time`) USING BTREE COMMENT '定时任务扫描待补偿记录'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短链接统计 MQ 失败补偿表';

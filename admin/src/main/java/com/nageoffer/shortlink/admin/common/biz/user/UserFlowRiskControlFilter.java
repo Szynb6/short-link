@@ -39,6 +39,7 @@ import org.springframework.scripting.support.ResourceScriptSource;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.nageoffer.shortlink.admin.common.convention.errorcode.BaseErrorCode.FLOW_LIMIT_ERROR;
 
@@ -64,13 +65,17 @@ public class UserFlowRiskControlFilter implements Filter {
         String username = Optional.ofNullable(UserContext.getUsername()).orElse("other");
         Long result;
         try {
-            result = stringRedisTemplate.execute(redisScript, Lists.newArrayList(username), userFlowRiskControlConfiguration.getTimeWindow());
+            result = stringRedisTemplate.execute(redisScript, Lists.newArrayList(username),
+                    userFlowRiskControlConfiguration.getTimeWindow(),
+                    String.valueOf(userFlowRiskControlConfiguration.getMaxAccessCount()),
+                    String.valueOf(System.currentTimeMillis()),
+                    UUID.randomUUID().toString());
         } catch (Throwable ex) {
             log.error("执行用户请求流量限制LUA脚本出错", ex);
             returnJson((HttpServletResponse) response, JSON.toJSONString(Results.failure(new ClientException(FLOW_LIMIT_ERROR))));
             return;
         }
-        if (result == null || result > userFlowRiskControlConfiguration.getMaxAccessCount()) {
+        if (result == null || result == 0) {
             returnJson((HttpServletResponse) response, JSON.toJSONString(Results.failure(new ClientException(FLOW_LIMIT_ERROR))));
             return;
         }

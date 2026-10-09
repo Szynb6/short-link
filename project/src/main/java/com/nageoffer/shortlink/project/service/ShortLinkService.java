@@ -96,10 +96,4 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      */
     void restoreUrl(String shortUri, ServletRequest request, ServletResponse response);
 
-    /**
-     * 短链接统计
-     *
-     * @param shortLinkStatsRecord 短链接统计实体参数
-     */
-    void shortLinkStats(ShortLinkStatsRecordDTO shortLinkStatsRecord);
 }
