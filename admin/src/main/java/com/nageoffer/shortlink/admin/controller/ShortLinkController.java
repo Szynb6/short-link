@@ -18,8 +18,10 @@
 package com.nageoffer.shortlink.admin.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.nageoffer.shortlink.admin.common.annotation.RateLimit;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.common.convention.result.Results;
+import com.nageoffer.shortlink.admin.common.enums.LimitDimension;
 import com.nageoffer.shortlink.admin.remote.ShortLinkActualRemoteService;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkBatchCreateReqDTO;
 import com.nageoffer.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
@@ -53,6 +55,12 @@ public class ShortLinkController {
     /**
      * 创建短链接
      */
+    @RateLimit({
+            @RateLimit.Rule(dimension = LimitDimension.GLOBAL, timeWindow = 1, maxCount = 1000),
+            @RateLimit.Rule(dimension = LimitDimension.API, timeWindow = 1, maxCount = 200),
+            @RateLimit.Rule(dimension = LimitDimension.USER, timeWindow = 1, maxCount = 20),
+            @RateLimit.Rule(dimension = LimitDimension.IP, timeWindow = 1, maxCount = 30)
+    })
     @PostMapping("/api/short-link/admin/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortLink(@RequestBody ShortLinkCreateReqDTO requestParam) {
         return shortLinkActualRemoteService.createShortLink(requestParam);
@@ -62,6 +70,12 @@ public class ShortLinkController {
      * 批量创建短链接
      */
     @SneakyThrows
+    @RateLimit({
+            @RateLimit.Rule(dimension = LimitDimension.GLOBAL, timeWindow = 1, maxCount = 1000),
+            @RateLimit.Rule(dimension = LimitDimension.API, timeWindow = 1, maxCount = 50),
+            @RateLimit.Rule(dimension = LimitDimension.USER, timeWindow = 10, maxCount = 5),
+            @RateLimit.Rule(dimension = LimitDimension.IP, timeWindow = 10, maxCount = 10)
+    })
     @PostMapping("/api/short-link/admin/v1/create/batch")
     public void batchCreateShortLink(@RequestBody ShortLinkBatchCreateReqDTO requestParam, HttpServletResponse response) {
         Result<ShortLinkBatchCreateRespDTO> shortLinkBatchCreateRespDTOResult = shortLinkActualRemoteService.batchCreateShortLink(requestParam);

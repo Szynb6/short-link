@@ -17,8 +17,10 @@
 
 package com.nageoffer.shortlink.admin.controller;
 
+import com.nageoffer.shortlink.admin.common.annotation.RateLimit;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.common.convention.result.Results;
+import com.nageoffer.shortlink.admin.common.enums.LimitDimension;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupSaveReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupSortReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.ShortLinkGroupUpdateReqDTO;
@@ -48,6 +50,12 @@ public class GroupController {
     /**
      * 新增短链接分组
      */
+    @RateLimit({
+            @RateLimit.Rule(dimension = LimitDimension.GLOBAL, timeWindow = 1, maxCount = 1000),
+            @RateLimit.Rule(dimension = LimitDimension.API, timeWindow = 1, maxCount = 200),
+            @RateLimit.Rule(dimension = LimitDimension.USER, timeWindow = 1, maxCount = 20),
+            @RateLimit.Rule(dimension = LimitDimension.IP, timeWindow = 1, maxCount = 30)
+    })
     @PostMapping("/api/short-link/admin/v1/group")
     public Result<Void> save(@RequestBody ShortLinkGroupSaveReqDTO requestParam) {
         groupService.saveGroup(requestParam.getName());

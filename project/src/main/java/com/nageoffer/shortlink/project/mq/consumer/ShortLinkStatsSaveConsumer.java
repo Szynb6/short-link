@@ -33,6 +33,7 @@ import com.nageoffer.shortlink.project.dao.entity.LinkDeviceStatsDO;
 import com.nageoffer.shortlink.project.dao.entity.LinkLocaleStatsDO;
 import com.nageoffer.shortlink.project.dao.entity.LinkNetworkStatsDO;
 import com.nageoffer.shortlink.project.dao.entity.LinkOsStatsDO;
+import com.nageoffer.shortlink.project.dao.entity.LinkStatsConsumeLogDO;
 import com.nageoffer.shortlink.project.dao.entity.LinkStatsTodayDO;
 import com.nageoffer.shortlink.project.dao.entity.ShortLinkGotoDO;
 import com.nageoffer.shortlink.project.dao.mapper.LinkAccessLogsMapper;
@@ -42,6 +43,7 @@ import com.nageoffer.shortlink.project.dao.mapper.LinkDeviceStatsMapper;
 import com.nageoffer.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
 import com.nageoffer.shortlink.project.dao.mapper.LinkNetworkStatsMapper;
 import com.nageoffer.shortlink.project.dao.mapper.LinkOsStatsMapper;
+import com.nageoffer.shortlink.project.dao.mapper.LinkStatsConsumeLogMapper;
 import com.nageoffer.shortlink.project.dao.mapper.LinkStatsTodayMapper;
 import com.nageoffer.shortlink.project.dao.mapper.ShortLinkGotoMapper;
 import com.nageoffer.shortlink.project.dao.mapper.ShortLinkMapper;
@@ -56,6 +58,7 @@ import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -95,6 +98,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<MessageExt> 
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
     private final LinkStatsTodayMapper linkStatsTodayMapper;
+    private final LinkStatsConsumeLogMapper linkStatsConsumeLogMapper;
     private final MessageQueueIdempotentHandler messageQueueIdempotentHandler;
     private final TransactionTemplate transactionTemplate;
 
@@ -118,7 +122,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<MessageExt> 
         try {
             String messageBody = new String(message.getBody(), StandardCharsets.UTF_8);
             ShortLinkStatsRecordDTO statsRecord = JSON.parseObject(messageBody, ShortLinkStatsRecordDTO.class);
-            actualSaveShortLinkStats(statsRecord);
+            actualSaveShortLinkStats(keys, statsRecord);
         } catch (Throwable ex) {
             // 消费流程异常：删除幂等标识，抛出异常触发 RocketMQ 按延迟级别退避重试
             messageQueueIdempotentHandler.delMessageProcessed(keys);
@@ -129,7 +133,7 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<MessageExt> 
         messageQueueIdempotentHandler.setAccomplish(keys);
     }
 
-    public void actualSaveShortLinkStats(ShortLinkStatsRecordDTO statsRecord) {
+    public void actualSaveShortLinkStats(String keys, ShortLinkStatsRecordDTO statsRecord) {
         String fullShortUrl = statsRecord.getFullShortUrl();
         Date currentDate = statsRecord.getCurrentDate();
         // ① 锁外/事务外：调用高德地图 API 获取用户位置信息
@@ -146,6 +150,18 @@ public class ShortLinkStatsSaveConsumer implements RocketMQListener<MessageExt> 
         rLock.lock();
         try {
             transactionTemplate.execute(status -> {
+                // MySQL 唯一消息 ID 幂等兜底：与多表统计更新同事务，防止 Redis 过期或宕机窗口导致的重复累加
+                if (StrUtil.isNotBlank(keys)) {
+                    try {
+                        linkStatsConsumeLogMapper.insert(LinkStatsConsumeLogDO.builder()
+                                .msgKeys(keys)
+                                .fullShortUrl(fullShortUrl)
+                                .build());
+                    } catch (DuplicateKeyException ex) {
+                        log.info("消息 {} 已消费过（MySQL 唯一索引幂等拦截），跳过重复累加", keys);
+                        return null;
+                    }
+                }
                 LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
                         .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl);
                 // 通过短链接拿到分组id

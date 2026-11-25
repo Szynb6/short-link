@@ -18,8 +18,10 @@
 package com.nageoffer.shortlink.admin.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.nageoffer.shortlink.admin.common.annotation.RateLimit;
 import com.nageoffer.shortlink.admin.common.convention.result.Result;
 import com.nageoffer.shortlink.admin.common.convention.result.Results;
+import com.nageoffer.shortlink.admin.common.enums.LimitDimension;
 import com.nageoffer.shortlink.admin.dto.req.UserLoginReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.UserRegisterReqDTO;
 import com.nageoffer.shortlink.admin.dto.req.UserUpdateReqDTO;
@@ -74,6 +76,11 @@ public class UserController {
     /**
      * 注册用户
      */
+    @RateLimit({
+            @RateLimit.Rule(dimension = LimitDimension.GLOBAL, timeWindow = 1, maxCount = 1000),
+            @RateLimit.Rule(dimension = LimitDimension.API, timeWindow = 1, maxCount = 100),
+            @RateLimit.Rule(dimension = LimitDimension.IP, timeWindow = 60, maxCount = 10)
+    })
     @PostMapping("/api/short-link/admin/v1/user")
     public Result<Void> register(@RequestBody UserRegisterReqDTO requestParam) {
         userService.register(requestParam);
@@ -92,6 +99,11 @@ public class UserController {
     /**
      * 用户登录
      */
+    @RateLimit({
+            @RateLimit.Rule(dimension = LimitDimension.GLOBAL, timeWindow = 1, maxCount = 1000),
+            @RateLimit.Rule(dimension = LimitDimension.API, timeWindow = 1, maxCount = 200),
+            @RateLimit.Rule(dimension = LimitDimension.IP, timeWindow = 60, maxCount = 20)
+    })
     @PostMapping("/api/short-link/admin/v1/user/login")
     public Result<UserLoginRespDTO> login(@RequestBody UserLoginReqDTO requestParam) {
         return Results.success(userService.login(requestParam));
